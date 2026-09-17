@@ -299,9 +299,7 @@ def persistent_all_gather_tdm_gfx1250_warp_team(
     sub_block_m: gl.constexpr = block_m // warps_per_tile
 
     dtype: gl.constexpr = input_ptr.dtype.element_ty
-    smem_layout: gl.constexpr = gl.PaddedSharedLayout.with_identity_for(
-        [[block_n, 8]], [sub_block_m, block_n], [1, 0]
-    )
+    smem_layout: gl.constexpr = gl.PaddedSharedLayout.with_identity_for([[block_n, 8]], [sub_block_m, block_n], [1, 0])
     smem = gl.allocate_shared_memory(dtype, [sub_block_m, block_n], layout=smem_layout)
 
     out_m = M * world_size
@@ -540,8 +538,18 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_improved(
 
     if num_slices == 1:
         _ag_warp_slice_loop_improved(
-            args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-            pid, num_tiles_n, num_tiles_m, num_slices, 0,
+            args,
+            M,
+            N,
+            stride_in_m,
+            stride_in_n,
+            stride_out_m,
+            stride_out_n,
+            pid,
+            num_tiles_n,
+            num_tiles_m,
+            num_slices,
+            0,
         )
     elif num_slices == 2:
         gl.warp_specialize(
@@ -549,13 +557,37 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_improved(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        1,
+                    ),
                 ),
             ],
             [1, 1],
@@ -566,23 +598,71 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_improved(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        1,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 2),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        2,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 3),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        3,
+                    ),
                 ),
             ],
             [1, 1, 1, 1],
@@ -593,43 +673,139 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_improved(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        1,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 2),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        2,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 3),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        3,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 4),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        4,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 5),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        5,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 6),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        6,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_improved,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n,
-                     pid, num_tiles_n, num_tiles_m, num_slices, 7),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        num_tiles_m,
+                        num_slices,
+                        7,
+                    ),
                 ),
             ],
             [1, 1, 1, 1, 1, 1, 1, 1],
@@ -686,11 +862,35 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_local_smem(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        1,
+                    ),
                 ),
             ],
             [1, 1],
@@ -701,19 +901,67 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_local_smem(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        1,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 2),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        2,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 3),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        3,
+                    ),
                 ),
             ],
             [1, 1, 1, 1],
@@ -724,35 +972,131 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized_local_smem(
                 (_ag_warp_epilogue, ()),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 0),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        0,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 1),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        1,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 2),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        2,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 3),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        3,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 4),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        4,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 5),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        5,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 6),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        6,
+                    ),
                 ),
                 (
                     _ag_warp_slice_loop_local_smem,
-                    (args, M, N, stride_in_m, stride_in_n, stride_out_m, stride_out_n, pid, num_tiles_n, total_tiles, 7),
+                    (
+                        args,
+                        M,
+                        N,
+                        stride_in_m,
+                        stride_in_n,
+                        stride_out_m,
+                        stride_out_n,
+                        pid,
+                        num_tiles_n,
+                        total_tiles,
+                        7,
+                    ),
                 ),
             ],
             [1, 1, 1, 1, 1, 1, 1, 1],
@@ -871,9 +1215,7 @@ def persistent_all_gather_tdm_gfx1250_warp_specialized(
     sub_block_m: gl.constexpr = block_m // num_slices
 
     dtype: gl.constexpr = input_ptr.dtype.element_ty
-    smem_layout: gl.constexpr = gl.PaddedSharedLayout.with_identity_for(
-        [[block_n, 8]], [sub_block_m, block_n], [1, 0]
-    )
+    smem_layout: gl.constexpr = gl.PaddedSharedLayout.with_identity_for([[block_n, 8]], [sub_block_m, block_n], [1, 0])
     smem = gl.allocate_shared_memory(dtype, [num_slices, sub_block_m, block_n], layout=smem_layout)
 
     num_tiles_n = gl.cdiv(N, block_n)
@@ -951,14 +1293,11 @@ def _validate_tdm_warp_subtile(config, elem_size: int, max_lds: int, *, lds_fact
 
     if warps_per_tile not in (1, 2, 4, 8):
         raise ValueError(
-            f"TDM all-gather (warp_team/warp_specialized) requires num_warps in {{1, 2, 4, 8}}, "
-            f"got {warps_per_tile}."
+            f"TDM all-gather (warp_team/warp_specialized) requires num_warps in {{1, 2, 4, 8}}, got {warps_per_tile}."
         )
 
     if not _is_power_of_2(warps_per_tile):
-        raise ValueError(
-            f"TDM all-gather (warp_team) requires num_warps to be a power of 2, got {warps_per_tile}."
-        )
+        raise ValueError(f"TDM all-gather (warp_team) requires num_warps to be a power of 2, got {warps_per_tile}.")
 
     if block_m % warps_per_tile != 0:
         raise ValueError(
@@ -974,14 +1313,11 @@ def _validate_tdm_warp_subtile(config, elem_size: int, max_lds: int, *, lds_fact
         )
 
     if not _is_power_of_2(block_n):
-        raise ValueError(
-            f"TDM block_size_n must be a power of 2 (PaddedSharedLayout requirement), got {block_n}."
-        )
+        raise ValueError(f"TDM block_size_n must be a power of 2 (PaddedSharedLayout requirement), got {block_n}.")
 
     if sub_block_m > TDM_MAX_DIM or block_n > TDM_MAX_DIM:
         raise ValueError(
-            f"TDM sub-tile dimensions must be <= {TDM_MAX_DIM}, "
-            f"got sub_block_m={sub_block_m}, block_n={block_n}."
+            f"TDM sub-tile dimensions must be <= {TDM_MAX_DIM}, got sub_block_m={sub_block_m}, block_n={block_n}."
         )
 
     row_bytes = block_n * elem_size

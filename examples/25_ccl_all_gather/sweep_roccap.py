@@ -85,7 +85,9 @@ HEAP_SIZE = [1 << 31]
 VALIDATE = [False]
 USE_GLUON = [True]
 USE_TDM = [True]
-ALL_GATHER_TDM_VARIANT = ["stepwise"]  # "hoisted" | "stepwise" | "warp_team" | "warp_specialized" | "warp_specialized_local_smem" | "warp_specialized_improved"
+ALL_GATHER_TDM_VARIANT = [
+    "stepwise"
+]  # "hoisted" | "stepwise" | "warp_team" | "warp_specialized" | "warp_specialized_local_smem" | "warp_specialized_improved"
 
 # Minimum .cap file size (MiB) for a capture to count as successful.
 # Use 10.0 for full production sweeps; lower temporarily for small smoke-test configs.
