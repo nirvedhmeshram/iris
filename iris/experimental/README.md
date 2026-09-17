@@ -104,6 +104,39 @@ inter-node case -- where `rocshmem_ptr` returns NULL and
 `SymmetricAddressMap.direct` reports the peer as unreachable -- has no automated
 coverage, since it needs two nodes.
 
+### Symmetric-heap allocators
+
+rocSHMEM selects the allocator backing its symmetric heap at run time, via
+`ROCSHMEM_HEAP_ALLOCATOR_TYPE`. The provider works across them, because the
+allocator only changes *how the heap is obtained*, not its shape: rocSHMEM
+allocates the heap once at init and sub-allocates it with dlmalloc, so one
+mapping covers every allocation.
+
+Measured on MI350X (gfx950), 2 ranks, rocSHMEM 3.8.0:
+
+| value | on gfx950 |
+| --- | --- |
+| `finegrained` (default here) | works |
+| `uncached`, `coarsegrained` | not exercised |
+| `vmm_posix` — VMM, POSIX fd IPC | **works** (ROCm 7.2+); per-peer offsets identical to `finegrained` |
+| `vmm_fabric` — VMM, fabric handle IPC | **unavailable**; needs a GPU with fabric handle support |
+
+`vmm_fabric` is gated twice. At build time on `HAVE_AMDSMI_GPU_FABRIC_INFO`, which
+needs an `amd_smi` exporting `amdsmi_get_gpu_fabric_info` *and* a HIP runtime with
+`hipMemFabricHandle_t` — off on ROCm 7.2.1, on from 7.14. Then at run time, where
+even with it compiled in rocSHMEM queries the device and reports `Fabric handle
+type is not supported on device N` before aborting. So it is a hardware
+capability (MI455/gfx1250), not a packaging gap, and no build configuration
+reaches it on MI350.
+
+`vmm_posix` is worth knowing about anyway: it exercises the same VMM allocator
+machinery, differing only in how peers exchange handles. It needs ROCm 7.2+,
+Linux 5.6+, and a TCP bootstrap, which `init_rocshmem_by_uniqueid` provides.
+`tests/unittests/test_rocshmem_provider_vmm.py` covers it.
+
+Note rocSHMEM **aborts** rather than raising when an allocator is unavailable, so
+guard on the ROCm version before selecting one — a `try`/`except` will not help.
+
 ### Running
 
 rocSHMEM must be initialised before the provider is constructed; the caller owns
