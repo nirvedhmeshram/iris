@@ -10,6 +10,7 @@ Each run executes torchrun + roccap_wrapper, then renames generated .cap and
 .json files to unique names encoding the sweep parameters, e.g.:
     persistent_all_gather_tdm_gfx1250_64x64_512x256_80sms_1stage_fp32_8warps_2nproc_rank0.cap
     persistent_all_gather_tdm_gfx1250_stepwise_...  (all_gather_tdm_variant=stepwise)
+    persistent_all_gather_tdm_gfx1250_warp_team_...  (all_gather_tdm_variant=warp_team)
 
 Notes for TDM sweeps:
   - Use fp32; block_size_m/block_size_n must be powers of 2 (PaddedSharedLayout).
@@ -40,6 +41,14 @@ def roccap_kernel(use_gluon: bool, use_tdm: bool, all_gather_tdm_variant: str = 
             raise ValueError("use_tdm=True requires use_gluon=True")
         if all_gather_tdm_variant == "stepwise":
             return "persistent_all_gather_tdm_gfx1250_stepwise"
+        if all_gather_tdm_variant == "warp_team":
+            return "persistent_all_gather_tdm_gfx1250_warp_team"
+        if all_gather_tdm_variant == "warp_specialized":
+            return "persistent_all_gather_tdm_gfx1250_warp_specialized"
+        if all_gather_tdm_variant == "warp_specialized_local_smem":
+            return "persistent_all_gather_tdm_gfx1250_warp_specialized_local_smem"
+        if all_gather_tdm_variant == "warp_specialized_improved":
+            return "persistent_all_gather_tdm_gfx1250_warp_specialized_improved"
         if all_gather_tdm_variant != "hoisted":
             raise ValueError(f"Unknown all_gather_tdm_variant: {all_gather_tdm_variant}")
         return "persistent_all_gather_tdm_gfx1250"
@@ -76,7 +85,7 @@ HEAP_SIZE = [1 << 31]
 VALIDATE = [False]
 USE_GLUON = [True]
 USE_TDM = [True]
-ALL_GATHER_TDM_VARIANT = ["stepwise"]  # "hoisted" | "stepwise"
+ALL_GATHER_TDM_VARIANT = ["stepwise"]  # "hoisted" | "stepwise" | "warp_team" | "warp_specialized" | "warp_specialized_local_smem" | "warp_specialized_improved"
 
 # Minimum .cap file size (MiB) for a capture to count as successful.
 # Use 10.0 for full production sweeps; lower temporarily for small smoke-test configs.

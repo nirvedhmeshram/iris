@@ -47,9 +47,20 @@ def parse_args():
         "--all_gather_tdm_variant",
         type=str,
         default="hoisted",
-        choices=["hoisted", "stepwise"],
-        help="TDM all-gather kernel: hoisted (unrolled stores, W<=8) or "
-        "stepwise (dynamic descriptors in inner loop, any W; same tile loop as hoisted)",
+        choices=[
+            "hoisted",
+            "stepwise",
+            "warp_team",
+            "warp_specialized",
+            "warp_specialized_local_smem",
+            "warp_specialized_improved",
+        ],
+        help="TDM all-gather kernel: hoisted (unrolled stores, W<=8), "
+        "stepwise (dynamic descriptors, any W), "
+        "warp_team (single-wave CTAs, full TDM sub-tiles), "
+        "warp_specialized (per-warp LDS via warp_specialize, TransferBench-style), "
+        "warp_specialized_local_smem (warp_specialized with per-partition smem alloc), or "
+        "warp_specialized_improved (no idle epilogue + sub-tile striping)",
     )
     return vars(parser.parse_args())
 

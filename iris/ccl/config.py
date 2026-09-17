@@ -38,10 +38,23 @@ class Config:
                            - "persistent": Each PID handles multiple tiles and sends to all ranks
                            - "partitioned": PIDs partitioned across ranks, eliminates inner loop
         all_gather_tdm_variant: TDM all-gather kernel variant when use_tdm=True (default: "hoisted")
-                           Options: "hoisted", "stepwise"
+                           Options: "hoisted", "stepwise", "warp_team", "warp_specialized",
+                             "warp_specialized_local_smem", "warp_specialized_improved"
                            - "hoisted": One load + unrolled stores per tile (world_size <= 8)
                            - "stepwise": Same tile loop as hoisted; dynamic output
                              descriptors in inner dest loop (arbitrary world_size)
+                           - "warp_team": Single-wave CTAs (launch num_warps=1) doing full
+                             TDM load+store on block_size_m/num_warps row sub-tiles;
+                             config.num_warps stripes one logical tile across CTAs
+                             for barrier-free async_wait
+                           - "warp_specialized": warp_specialize isolates each warp with a private
+                             smem.index(i) slice (TransferBench-style); num_warps in {1,2,4,8}
+                             splits block_size_m/num_warps rows per warp; launch num_warps=1
+                             plus num_warps-1 worker warps (8 config -> 8 isolated warps/CTA)
+                           - "warp_specialized_local_smem": same dispatch as warp_specialized,
+                             but each worker partition allocates its own smem locally
+                           - "warp_specialized_improved": warp_specialized_local_smem +
+                             warp_team-style sub-tile striping (barrier experiment)
         all_to_all_variant: Variant for all-to-all operation (default: "persistent")
                            Options: "persistent", "partitioned"
                            - "persistent": Each PID handles multiple tiles and sends to all ranks
@@ -138,9 +151,18 @@ class Config:
             raise ValueError(
                 f"all_gather_variant must be one of: 'persistent', 'partitioned', got {self.all_gather_variant}"
             )
-        if self.all_gather_tdm_variant not in ["hoisted", "stepwise"]:
+        if self.all_gather_tdm_variant not in [
+            "hoisted",
+            "stepwise",
+            "warp_team",
+            "warp_specialized",
+            "warp_specialized_local_smem",
+            "warp_specialized_improved",
+        ]:
             raise ValueError(
-                f"all_gather_tdm_variant must be one of: 'hoisted', 'stepwise', got {self.all_gather_tdm_variant}"
+                f"all_gather_tdm_variant must be one of: 'hoisted', 'stepwise', 'warp_team', "
+                f"'warp_specialized', 'warp_specialized_local_smem', 'warp_specialized_improved', "
+                f"got {self.all_gather_tdm_variant}"
             )
         if self.all_to_all_variant not in ["persistent", "partitioned"]:
             raise ValueError(
