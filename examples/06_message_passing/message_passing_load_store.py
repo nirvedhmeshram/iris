@@ -136,13 +136,13 @@ def parse_args():
 
 def _worker(local_rank: int, world_size: int, init_url: str, args: dict):
     """Worker function for PyTorch distributed execution."""
-    backend = "nccl" if torch.cuda.is_available() else "gloo"
+    backend = "gloo"
     dist.init_process_group(
         backend=backend,
         init_method=init_url,
         world_size=world_size,
         rank=local_rank,
-        device_id=torch.device(f"cuda:{local_rank}"),
+        device_id=torch.device(f"cuda:{local_rank % max(1, torch.cuda.device_count())}"),
     )
 
     # Main benchmark logic
@@ -153,6 +153,14 @@ def _worker(local_rank: int, world_size: int, init_url: str, args: dict):
 
     # Allocate source and destination buffers on the symmetric heap
     source_buffer = shmem.zeros(args["buffer_size"], device="cuda", dtype=dtype)
+    # STRONG TEST: non-zero, position-dependent payload so a vacuous
+    # all-zero transfer cannot pass validation.
+    import os as _os
+    if _os.environ.get("IRIS_MP_NONZERO"):
+        source_buffer.copy_(
+            (torch.arange(source_buffer.numel(), device="cuda", dtype=torch.float32) % 97 + 1).to(dtype)
+        )
+        torch.cuda.synchronize()
     if dtype.is_floating_point:
         destination_buffer = shmem.randn(args["buffer_size"], device="cuda", dtype=dtype)
     else:
@@ -196,6 +204,17 @@ def _worker(local_rank: int, world_size: int, init_url: str, args: dict):
     success = True
     if cur_rank == consumer_rank:
         expected = source_buffer * 2
+        bs = args["block_size"]; n = source_buffer.numel()
+        ok = (destination_buffer == expected)
+        import torch as _t
+        per_block = [int(ok[i*bs:(i+1)*bs].sum().item()) for i in range(0, min(6, (n+bs-1)//bs))]
+        shmem.info(f"BLOCKS block_size={bs} n={n} correct_per_block(first6)={per_block} of {bs}")
+        shmem.info(f"DST sample idx0={destination_buffer[0].item()} idx{bs}={destination_buffer[bs].item()} "
+                   f"idx{bs*2}={destination_buffer[bs*2].item()} | EXP idx{bs}={expected[bs].item()}")
+        uniq = _t.unique(destination_buffer)
+        shmem.info(f"DST unique values: {uniq.numel()} (first 8: {uniq[:8].tolist()})")
+        shmem.info(f"PAYLOAD CHECK src nonzero={int((source_buffer!=0).sum().item())}/{source_buffer.numel()} "
+                   f"src[:4]={source_buffer[:4].tolist()} dst[:4]={destination_buffer[:4].tolist()}")
         diff_mask = ~torch.isclose(destination_buffer, expected, atol=1)
         breaking_indices = torch.nonzero(diff_mask, as_tuple=False)
 
