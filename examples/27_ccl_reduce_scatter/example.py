@@ -48,7 +48,7 @@ def parse_args():
         "--reduce_scatter_tdm_variant",
         type=str,
         default="hoisted",
-        choices=["hoisted", "stepwise"],
+        choices=["hoisted", "stepwise", "split"],
         help="TDM reduce-scatter kernel: hoisted (unrolled loads, W<=8) or "
         "stepwise (dynamic descriptors in inner loop, any W; same tile loop as hoisted)",
     )

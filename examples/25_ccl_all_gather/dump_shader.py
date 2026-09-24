@@ -41,6 +41,7 @@ VARIANT_KERNEL = {
     "warp_specialized": "persistent_all_gather_tdm_gfx1250_warp_specialized",
     "warp_specialized_local_smem": "persistent_all_gather_tdm_gfx1250_warp_specialized_local_smem",
     "warp_specialized_improved": "persistent_all_gather_tdm_gfx1250_warp_specialized_improved",
+    "mbarrier": "persistent_all_gather_tdm_gfx1250_mbarrier",
 }
 
 BARRIER_PATTERNS = [

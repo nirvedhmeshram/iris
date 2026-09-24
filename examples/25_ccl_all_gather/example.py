@@ -54,13 +54,15 @@ def parse_args():
             "warp_specialized",
             "warp_specialized_local_smem",
             "warp_specialized_improved",
+            "mbarrier",
         ],
         help="TDM all-gather kernel: hoisted (unrolled stores, W<=8), "
         "stepwise (dynamic descriptors, any W), "
         "warp_team (single-wave CTAs, full TDM sub-tiles), "
         "warp_specialized (per-warp LDS via warp_specialize, TransferBench-style), "
-        "warp_specialized_local_smem (warp_specialized with per-partition smem alloc), or "
-        "warp_specialized_improved (no idle epilogue + sub-tile striping)",
+        "warp_specialized_local_smem (warp_specialized with per-partition smem alloc), "
+        "warp_specialized_improved (no idle epilogue + sub-tile striping), or "
+        "mbarrier (hoisted with mbarrier TDM completion instead of async_wait)",
     )
     return vars(parser.parse_args())
 

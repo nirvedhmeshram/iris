@@ -158,11 +158,12 @@ class Config:
             "warp_specialized",
             "warp_specialized_local_smem",
             "warp_specialized_improved",
+            "mbarrier",
         ]:
             raise ValueError(
                 f"all_gather_tdm_variant must be one of: 'hoisted', 'stepwise', 'warp_team', "
                 f"'warp_specialized', 'warp_specialized_local_smem', 'warp_specialized_improved', "
-                f"got {self.all_gather_tdm_variant}"
+                f"'mbarrier', got {self.all_gather_tdm_variant}"
             )
         if self.all_to_all_variant not in ["persistent", "partitioned"]:
             raise ValueError(
@@ -193,7 +194,7 @@ class Config:
         # Validate reduce_scatter_variant
         if self.reduce_scatter_variant != "two_shot":
             raise ValueError(f"reduce_scatter_variant must be 'two_shot', got '{self.reduce_scatter_variant}'")
-        if self.reduce_scatter_tdm_variant not in ["hoisted", "stepwise"]:
+        if self.reduce_scatter_tdm_variant not in ["hoisted", "stepwise", "split"]:
             raise ValueError(
                 f"reduce_scatter_tdm_variant must be one of: 'hoisted', 'stepwise', "
                 f"got {self.reduce_scatter_tdm_variant}"

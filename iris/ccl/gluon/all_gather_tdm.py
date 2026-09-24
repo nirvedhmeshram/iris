@@ -44,6 +44,7 @@ try:
     from triton.experimental import gluon
     from triton.experimental.gluon import language as gl
     from triton.experimental.gluon.language.amd.gfx1250 import tdm as gfx1250_tdm
+    from triton.experimental.gluon.language.amd.gfx1250 import mbarrier as gfx1250_mbarrier
     from triton.language.core import _aggregate as aggregate
 
     GFX1250_TDM_AVAILABLE = True
@@ -199,6 +200,167 @@ def persistent_all_gather_tdm_gfx1250(
             gfx1250_tdm.async_store(out_desc_7, [out_row_off, col_off], smem)
 
         gfx1250_tdm.async_wait(0)
+
+
+@gluon.jit
+def persistent_all_gather_tdm_gfx1250_mbarrier(
+    input_ptr,
+    output_ptr,
+    elem_deltas,
+    M,
+    N,
+    stride_in_m,
+    stride_in_n,
+    stride_out_m,
+    stride_out_n,
+    group_rank: gl.constexpr,
+    world_size: gl.constexpr,
+    block_m: gl.constexpr,
+    block_n: gl.constexpr,
+    COMM_SMS: gl.constexpr,
+):
+    """
+    All-gather via TDM: 1 HBM->LDS load + world_size HBM/XGMI stores per tile.
+
+    Rank g writes its input tiles to output[g*M : (g+1)*M, :] on every rank.
+    """
+    pid = gl.program_id(0)
+
+    dtype: gl.constexpr = input_ptr.dtype.element_ty
+    smem_layout: gl.constexpr = gl.PaddedSharedLayout.with_identity_for([[block_n, 8]], [block_m, block_n], [1, 0])
+    smem = gl.allocate_shared_memory(dtype, [block_m, block_n], layout=smem_layout)
+
+    # Track TDM completion with mbarriers instead of async_wait. An mbarrier is
+    # cross-wave by construction, so it orders the LDS tile for the whole
+    # workgroup without relying on the per-wave tensor counter.
+    #
+    # A TDM copy arrives on its mbarrier once per warp, so the expected arrival
+    # count is (warps) x (number of TDM ops attached to that barrier): one load
+    # for bar_load, world_size stores for bar_store.
+    warps: gl.constexpr = gl.num_warps()
+    bar_layout: gl.constexpr = gfx1250_mbarrier.MBarrierLayout()
+    bar_load = gl.allocate_shared_memory(gl.int64, [1], layout=bar_layout)
+    bar_store = gl.allocate_shared_memory(gl.int64, [1], layout=bar_layout)
+    gfx1250_mbarrier.init(bar_load, count=warps)
+    gfx1250_mbarrier.init(bar_store, count=warps * world_size)
+    phase = 0
+
+    out_m = M * world_size
+    num_tiles_m = gl.cdiv(M, block_m)
+    num_tiles_n = gl.cdiv(N, block_n)
+    total_tiles = num_tiles_m * num_tiles_n
+
+    input_desc = gfx1250_tdm.make_tensor_descriptor(
+        base=input_ptr,
+        shape=[M, N],
+        strides=[stride_in_m, stride_in_n],
+        block_shape=[block_m, block_n],
+        layout=smem_layout,
+    )
+
+    # Hoist per-destination output descriptors (traffic-shaped store order).
+    if world_size > 0:
+        d0 = gl.load(elem_deltas + ((group_rank + 0) % world_size))
+        out_desc_0 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d0,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 1:
+        d1 = gl.load(elem_deltas + ((group_rank + 1) % world_size))
+        out_desc_1 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d1,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 2:
+        d2 = gl.load(elem_deltas + ((group_rank + 2) % world_size))
+        out_desc_2 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d2,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 3:
+        d3 = gl.load(elem_deltas + ((group_rank + 3) % world_size))
+        out_desc_3 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d3,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 4:
+        d4 = gl.load(elem_deltas + ((group_rank + 4) % world_size))
+        out_desc_4 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d4,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 5:
+        d5 = gl.load(elem_deltas + ((group_rank + 5) % world_size))
+        out_desc_5 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d5,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 6:
+        d6 = gl.load(elem_deltas + ((group_rank + 6) % world_size))
+        out_desc_6 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d6,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+    if world_size > 7:
+        d7 = gl.load(elem_deltas + ((group_rank + 7) % world_size))
+        out_desc_7 = gfx1250_tdm.make_tensor_descriptor(
+            base=output_ptr + d7,
+            shape=[out_m, N],
+            strides=[stride_out_m, stride_out_n],
+            block_shape=[block_m, block_n],
+            layout=smem_layout,
+        )
+
+    for tile_id in range(pid, total_tiles, COMM_SMS):
+        tile_m = tile_id // num_tiles_n
+        tile_n = tile_id % num_tiles_n
+        row_off = tile_m * block_m
+        col_off = tile_n * block_n
+        out_row_off = group_rank * M + row_off
+
+        gfx1250_tdm.async_load(input_desc, [row_off, col_off], smem, mbarrier=bar_load)
+        gfx1250_mbarrier.wait(bar_load, phase)
+
+        if world_size > 0:
+            gfx1250_tdm.async_store(out_desc_0, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 1:
+            gfx1250_tdm.async_store(out_desc_1, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 2:
+            gfx1250_tdm.async_store(out_desc_2, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 3:
+            gfx1250_tdm.async_store(out_desc_3, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 4:
+            gfx1250_tdm.async_store(out_desc_4, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 5:
+            gfx1250_tdm.async_store(out_desc_5, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 6:
+            gfx1250_tdm.async_store(out_desc_6, [out_row_off, col_off], smem, mbarrier=bar_store)
+        if world_size > 7:
+            gfx1250_tdm.async_store(out_desc_7, [out_row_off, col_off], smem, mbarrier=bar_store)
+
+        gfx1250_mbarrier.wait(bar_store, phase)
+        phase = phase ^ 1
 
 
 @gluon.jit
@@ -1393,6 +1555,9 @@ def launch(
     elif tdm_variant == "warp_specialized_improved":
         kernel = persistent_all_gather_tdm_gfx1250_warp_specialized_improved
         algorithm = "all_gather_tdm_warp_specialized_improved"
+    elif tdm_variant == "mbarrier":
+        kernel = persistent_all_gather_tdm_gfx1250_mbarrier
+        algorithm = "all_gather_tdm_mbarrier"
     else:
         raise ValueError(f"Unknown all_gather_tdm_variant: {tdm_variant}")
 
