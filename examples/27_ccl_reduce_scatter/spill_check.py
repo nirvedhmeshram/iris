@@ -30,20 +30,23 @@ WRAPPER = HERE / "../../scripts/roccap_wrapper.py"
 EXAMPLE = HERE / "example.py"
 KERNEL_BASE = "persistent_reduce_scatter_tdm_gfx1250"
 
+_KERNEL_SUFFIX = {"hoisted": "", "split": "_split", "stepwise": "_stepwise", "padded": "_padded"}
+
 SPILL_INSNS = ("scratch_store", "scratch_load", "buffer_store_dword", "buffer_load_dword")
 
 
-def compile_one(block_m: int, block_n: int, warps: int, m: int, n: int, variant: str):
+def compile_one(block_m: int, block_n: int, warps: int, m: int, n: int, variant: str, dtype: str = "fp16", nproc: int = 1):
     artifacts = Path(tempfile.mkdtemp(prefix="rs_spill_"))
     env = os.environ.copy()
     env["IRIS_KERNEL_ARTIFACTS_DIR"] = str(artifacts)
     env.setdefault("IRIS_SIMULATION", "1")
     cmd = [
-        "torchrun", "--nproc_per_node=1", "--standalone", str(WRAPPER), "--skip-roccap",
-        "-k", KERNEL_BASE + ("_split" if variant == "split" else ("_stepwise" if variant == "stepwise" else "")), str(EXAMPLE),
+        "torchrun", f"--nproc_per_node={nproc}", "--standalone", str(WRAPPER), "--skip-roccap",
+        "-k", KERNEL_BASE + _KERNEL_SUFFIX.get(variant, ""), str(EXAMPLE),
         "-m", str(m), "-n", str(n),
         "--block_size_m", str(block_m), "--block_size_n", str(block_n),
         "--num_warps", str(warps), "--comm_sms", "64",
+        "--datatype", dtype,
         "--use_gluon", "--use_tdm", "--reduce_scatter_tdm_variant", variant,
     ]
     proc = subprocess.run(cmd, cwd=HERE, env=env, capture_output=True, text=True)
@@ -82,12 +85,14 @@ def main() -> int:
     ap.add_argument("-m", type=int, default=1024)
     ap.add_argument("-n", type=int, default=512)
     ap.add_argument("--variant", default="hoisted")
+    ap.add_argument("--datatype", default="fp16")
+    ap.add_argument("--nproc", type=int, default=1, help="world_size; it is constexpr and unrolls")
     a = ap.parse_args()
 
-    print(f"reduce_scatter TDM '{a.variant}'  block_n={a.block_n}  num_warps={a.num_warps}  M={a.m} N={a.n}")
+    print(f"reduce_scatter TDM '{a.variant}'  block_n={a.block_n}  num_warps={a.num_warps}  M={a.m} N={a.n}  world_size={a.nproc}")
     print(f"{'block_m':>8} {'vgpr':>6} {'sgpr':>6} {'vspill':>7} {'sspill':>7} {'scratch':>8} {'lds':>8} {'spill_insns':>12}")
     for bm in a.block_m:
-        r = compile_one(bm, a.block_n, a.num_warps, a.m, a.n, a.variant)
+        r = compile_one(bm, a.block_n, a.num_warps, a.m, a.n, a.variant, a.datatype, a.nproc)
         if not r["ok"]:
             print(f"{bm:>8}  FAILED: {r['reason']}")
             continue
