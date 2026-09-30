@@ -48,9 +48,11 @@ def parse_args():
         "--reduce_scatter_tdm_variant",
         type=str,
         default="hoisted",
-        choices=["hoisted", "stepwise", "split"],
-        help="TDM reduce-scatter kernel: hoisted (unrolled loads, W<=8) or "
-        "stepwise (dynamic descriptors in inner loop, any W; same tile loop as hoisted)",
+        choices=["hoisted", "stepwise", "split", "padded"],
+        help="TDM reduce-scatter kernel: hoisted (unrolled loads, W<=8), "
+        "stepwise (dynamic descriptors in inner loop, any W; same tile loop as hoisted), "
+        "split (non-pow2 block_m staged through two LDS buffers, two DMAs), or "
+        "padded (non-pow2 block_m in ONE DMA; pow2 LDS buffer, bounds-clamped copy)",
     )
     return vars(parser.parse_args())
 

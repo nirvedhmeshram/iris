@@ -194,9 +194,9 @@ class Config:
         # Validate reduce_scatter_variant
         if self.reduce_scatter_variant != "two_shot":
             raise ValueError(f"reduce_scatter_variant must be 'two_shot', got '{self.reduce_scatter_variant}'")
-        if self.reduce_scatter_tdm_variant not in ["hoisted", "stepwise", "split"]:
+        if self.reduce_scatter_tdm_variant not in ["hoisted", "stepwise", "split", "padded"]:
             raise ValueError(
-                f"reduce_scatter_tdm_variant must be one of: 'hoisted', 'stepwise', "
+                f"reduce_scatter_tdm_variant must be one of: 'hoisted', 'stepwise', 'split', 'padded', "
                 f"got {self.reduce_scatter_tdm_variant}"
             )
 

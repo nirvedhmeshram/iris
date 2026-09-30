@@ -88,6 +88,10 @@ def roccap_kernel(use_gluon: bool, use_tdm: bool, reduce_scatter_tdm_variant: st
             raise ValueError("use_tdm=True requires use_gluon=True")
         if reduce_scatter_tdm_variant == "stepwise":
             return "persistent_reduce_scatter_tdm_gfx1250_stepwise"
+        if reduce_scatter_tdm_variant == "split":
+            return "persistent_reduce_scatter_tdm_gfx1250_split"
+        if reduce_scatter_tdm_variant == "padded":
+            return "persistent_reduce_scatter_tdm_gfx1250_padded"
         if reduce_scatter_tdm_variant != "hoisted":
             raise ValueError(f"Unknown reduce_scatter_tdm_variant: {reduce_scatter_tdm_variant}")
         return "persistent_reduce_scatter_tdm_gfx1250"
