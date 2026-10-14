@@ -45,24 +45,24 @@ torchrun --standalone --nproc_per_node=8 examples/34_kimi_k3_fused_all_reduce/ex
 | `--rccl` | off | Also times `torch.distributed.all_reduce` on the same payload. |
 | `--calls` | `3` | Distinct inputs per round. An odd count catches buffer-slot reuse across calls. |
 
-The kernels need gfx950 because they use CDNA4 buffer intrinsics. They support 2, 4 or 8 ranks. K3 itself runs at 8; the smaller world sizes exist so the examples can run in CI.
+The kernels need gfx950 because they use CDNA4 buffer intrinsics. They support 2, 4 or 8 ranks and have been validated at all three. K3 itself runs at 8; the smaller world sizes exist so the examples can run in CI.
 
 ## Results
 
-Measured on 4 × MI355X with graph replay, slowest rank, Triton 3.7.1:
+Measured on 8 × MI355X (K3's tp8 group) with graph replay, slowest rank, Triton 3.7.1:
 
 | Kernel | M | Payload | Iris µs | RCCL `all_reduce` µs |
 |---|---:|---:|---:|---:|
-| attention two-stage (incl. staging copy) | 1 | 14 KiB | 13.6 | 23.7 |
-| | 8 | 112 KiB | 15.2 | 43.6 |
-| | 32 | 448 KiB | 18.0 | 28.9 |
-| attention + residual + AttnRes | 1 | 14 KiB | 10.8 | 23.8 |
-| | 8 | 112 KiB | 12.4 | 43.6 |
-| | 16 | 224 KiB | 14.7 | 41.5 |
-| MoE Lamport | 1 | 21 KiB | 6.6 | 22.0 |
-| | 4 | 84 KiB | 7.5 | 22.2 |
-| MoE two-stage | 8 | 168 KiB | 10.8 | 42.3 |
-| | 32 | 672 KiB | 14.1 | 29.2 |
+| attention two-stage (incl. staging copy) | 1 | 14 KiB | 14.5 | 20.3 |
+| | 8 | 112 KiB | 15.5 | 18.1 |
+| | 32 | 448 KiB | 17.0 | 25.0 |
+| attention + residual + AttnRes | 1 | 14 KiB | 13.3 | 20.6 |
+| | 8 | 112 KiB | 14.3 | 18.2 |
+| | 16 | 224 KiB | 16.6 | 22.6 |
+| MoE Lamport | 1 | 21 KiB | 7.4 | 21.0 |
+| | 6 | 126 KiB | 10.1 | 18.9 |
+| MoE two-stage | 8 | 168 KiB | 11.4 | 21.8 |
+| | 32 | 672 KiB | 12.6 | 27.7 |
 
 The RCCL column covers only the all-reduce. The fused AttnRes kernel also does the epilogue, which would otherwise be a separate kernel.
 
