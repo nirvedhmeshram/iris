@@ -58,13 +58,20 @@ BASE=$IMAGE_BASE CACHE=$IMAGE_CACHE SAVED=$IMAGE_SAVED
 
 ensure_image() {
     docker image inspect "$IMAGE" >/dev/null 2>&1 && { log "image $IMAGE present"; return; }
+    # Loading the saved image touches only this node's Docker, so nodes load in
+    # parallel (it takes about ten minutes); only a build needs the lock.
+    if [ -f "$SAVED" ]; then
+        log "loading $SAVED"
+        zstd -dc "$SAVED" | docker load
+        return
+    fi
     mkdir -p "$CACHE"
     exec 9>"$CACHE/lock"
     log "waiting for the image cache lock"
     flock 9
     if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
         if [ -f "$SAVED" ]; then
-            log "loading $SAVED"
+            log "loading $SAVED (saved by another node while this one waited)"
             zstd -dc "$SAVED" | docker load
         else
             log "building $IMAGE from $BASE (first use of this image: compiles Triton)"
