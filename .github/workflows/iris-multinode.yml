@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
+
+name: Iris Multi-node Tests
+
+# The RDMA paths -- RCCL GIN and wide EP across nodes -- on 2 nodes x 8 GPUs
+# linked by RDMA NICs. The single-node runners have no RDMA NIC, so there these
+# tests skip (tests/unittests/test_rccl_gin_provider.py) or never run
+# (examples/35_wide_ep_rccl_gin).
+#
+# Runs on a self-hosted runner labelled mi355x-2node-rdma, on a host that
+# submits Slurm jobs; .github/scripts/multinode/launch.sh has the details. The
+# scheduler settings are repository variables (IRIS_MN_ACCOUNT, IRIS_MN_QOS,
+# optional IRIS_MN_PARTITION, IRIS_MN_GRES, IRIS_MN_CACHE, and IRIS_MN_ENV for
+# the site's RCCL network settings); until
+# IRIS_MN_ACCOUNT is set, the job is skipped rather than left queued.
+#
+# Pull requests run in the `multinode` environment, whose required reviewers
+# approve each run, so code from a fork never reaches the nodes unreviewed.
+# They run only when the RDMA code or this job's own files change; every push
+# to main runs it.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "iris/rdma/**"
+      - "iris/csrc/rccl_gin/**"
+      - "iris/experimental/rccl_gin.py"
+      - "iris/experimental/wide_ep.py"
+      - "tests/unittests/test_rccl_gin_provider.py"
+      - "tests/run_tests_distributed.py"
+      - "examples/35_wide_ep_rccl_gin/**"
+      - "apptainer/iris.def"
+      - "docker/Dockerfile.multinode"
+      - ".github/scripts/install_rocshmem.sh"
+      - ".github/scripts/multinode/**"
+      - ".github/workflows/iris-multinode.yml"
+  workflow_dispatch:
+
+# One runner, so runs queue behind each other anyway; a newer push to the same
+# PR replaces its queued or running predecessor.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  multinode:
+    name: RCCL GIN + wide EP (2 nodes x 8 GPUs)
+    if: vars.IRIS_MN_ACCOUNT != ''
+    runs-on: [self-hosted, mi355x-2node-rdma]
+    environment: ${{ github.event_name == 'pull_request' && 'multinode' || '' }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run on 2 nodes
+        env:
+          IRIS_MN_ACCOUNT: ${{ vars.IRIS_MN_ACCOUNT }}
+          IRIS_MN_QOS: ${{ vars.IRIS_MN_QOS }}
+          IRIS_MN_PARTITION: ${{ vars.IRIS_MN_PARTITION }}
+          IRIS_MN_GRES: ${{ vars.IRIS_MN_GRES }}
+          IRIS_MN_CACHE: ${{ vars.IRIS_MN_CACHE }}
+          IRIS_MN_ENV: ${{ vars.IRIS_MN_ENV }}
+        run: bash .github/scripts/multinode/launch.sh

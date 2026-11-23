@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Image for the multi-node CI (.github/workflows/iris-multinode.yml), on hosts
+# that have Docker but not Apptainer.
+#
+# It is apptainer/iris.def, not a copy of it: the base image is iris.def's
+# `From:` line (passed in as BASE by .github/scripts/multinode/node.sh) and the
+# build runs iris.def's %post verbatim. So ROCm, Triton and rocSHMEM always
+# match the single-node CI. Only the RDMA userspace is added: ROCm 10.1 images
+# have no libibverbs, and without it RCCL reports GIN unavailable without
+# saying why. The NIC vendor's provider (libionic for AMD Pollara NICs) is not
+# installed here; it comes from the host, bind-mounted at run time.
+
+ARG BASE
+FROM ${BASE}
+
+SHELL ["/bin/bash", "-c"]
+
+COPY install_rocshmem.sh /opt/install_rocshmem.sh
+COPY iris.def /tmp/iris.def
+
+# %post is run with /bin/sh, as Apptainer does; it starts a `bash -c` itself.
+RUN sed -n '/^%post/,/^%environment/{/^%/d;p}' /tmp/iris.def > /tmp/post.sh && \
+    sh -e /tmp/post.sh && \
+    rm -f /tmp/post.sh /tmp/iris.def
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libibverbs1 ibverbs-providers && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /etc/libibverbs.d && \
+    { [ -f /etc/libibverbs.d/ionic.driver ] || echo "driver ionic" > /etc/libibverbs.d/ionic.driver; }
+
+# iris.def's %environment. Docker cannot source it, so it is restated here.
+ENV TRITON_PATH=/opt/triton \
+    ROCM_PATH=/opt/rocm \
+    PYTHONPATH=/opt/triton \
+    PATH=/opt/rocm/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH} \
+    OMPI_MCA_mtl="^ofi" \
+    OMPI_MCA_pml="ob1" \
+    HSA_NO_SCRATCH_RECLAIM=1

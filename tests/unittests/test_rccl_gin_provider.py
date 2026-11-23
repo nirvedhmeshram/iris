@@ -22,12 +22,16 @@ the tests. Skips when a prerequisite is missing -- no RCCL with
 the GIN device API, as with ROCm 7.x -- so it is inert in an image without one. Only RcclGinUnavailable is turned into a skip; any other error
 fails. Without a GIN backend (no RDMA NIC, as on CI runners) the load/store
 tests still run, since on one node every peer is direct, and the tests that
-send over GIN skip.
+send over GIN skip. With IRIS_REQUIRE_GIN=1, as in the multi-node CI
+(.github/workflows/iris-multinode.yml), each of those skips is a failure
+instead: there, GIN not running is the bug.
 
 The launcher runs a single node, so every peer is direct. GIN is still
 exercised: with full connectivity RCCL connects every rank pair, so
 test_gin_put_signal_reaches_every_peer sends to same-node peers over the NIC.
-The multi-node path is covered by examples/35_wide_ep_rccl_gin, not here.
+The tests are written for any rank layout, not just one node: each checks a
+peer's `direct` flag rather than assuming it. The multi-node CI runs them
+across nodes, where the remote peers are not direct and go over GIN.
 """
 
 import os
@@ -48,11 +52,18 @@ FLUSH_CYCLES = 4_000_000_000  # flush_timeout bound: about 2 s, vs microseconds 
 FLUSH_ROUNDS = 4  # the first put+flush in a process got through even when broken
 
 
+def _skip_or_fail(reason):
+    """Skip for a missing GIN prerequisite, or fail with IRIS_REQUIRE_GIN=1."""
+    if os.environ.get("IRIS_REQUIRE_GIN") == "1":
+        pytest.fail(f"IRIS_REQUIRE_GIN=1 but {reason}")
+    pytest.skip(reason)
+
+
 def _build_shim():
     """Build the shim (every rank; one builds, the rest wait on its lock). No
     RCCL with GIN headers skips; a build that fails fails."""
     if not os.environ.get("IRIS_RCCL_GIN_BUILD") and rccl_gin._find_rccl_home() is None:
-        pytest.skip("no RCCL with the GIN device API (set RCCL_HOME, or use ROCm 10.x)")
+        _skip_or_fail("no RCCL with the GIN device API (set RCCL_HOME, or use ROCm 10.x)")
     try:
         problem = None
         rccl_gin._build_dir()
@@ -75,7 +86,7 @@ def provider():
     try:
         prov = rccl_gin.RcclGinProvider()
     except rccl_gin.RcclGinUnavailable as exc:
-        pytest.skip(f"RCCL GIN unavailable: {exc}")
+        _skip_or_fail(f"RCCL GIN unavailable: {exc}")
     yield prov
     prov.close()
 
@@ -85,7 +96,7 @@ def device_comm(provider):
     """For the tests that send over GIN. Without a GIN backend (e.g. no RDMA
     NIC, as on CI runners) they skip, while the load/store tests still run."""
     if not provider.gin_available:
-        pytest.skip("no GIN backend (no RDMA NIC?); every peer is load/store reachable")
+        _skip_or_fail("no GIN backend (no RDMA NIC?); every peer is load/store reachable")
     return provider.device_comm(signal_count=provider.get_num_ranks())
 
 
@@ -339,7 +350,7 @@ def test_rdma_put_signal_reaches_every_peer(rdma_ctx):
     rank including itself, over the backend's transport."""
     ctx = rdma_ctx
     if not ctx.rdma.gin_available:
-        pytest.skip("no GIN backend (no RDMA NIC?); every peer is load/store reachable")
+        _skip_or_fail("no GIN backend (no RDMA NIC?); every peer is load/store reachable")
     ws, me = ctx.get_num_ranks(), ctx.get_rank()
     send = ctx.zeros(ws, BLOCK, dtype=torch.int32)
     recv = ctx.zeros(ws, BLOCK, dtype=torch.int32)
