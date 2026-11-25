@@ -73,3 +73,4 @@ docs/benchmark-results/*.png
 # Local Sphinx build
 docs/.venv/
 docs/_build/
+.cluster-logs/

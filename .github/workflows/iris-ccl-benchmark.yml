@@ -3,11 +3,27 @@
 
 name: Iris CCL Benchmark (Iris vs RCCL)
 
-# Deliberately not on pull_request: this is a measurement job, not a gate. By
-# default it sweeps the full grid -- three collectives x 2/4/8 ranks x 16 shapes
-# (2 MiB to 1 GiB) x fp16/bf16/fp8, for Iris and RCCL -- and holds all 8 GPUs
-# while it does, which per commit would crowd out the test jobs.
+# A measurement job, not a gate: it publishes Iris vs RCCL latencies for the CCL
+# collectives and fails only if the sweep itself breaks.
+#
+# Runs on a self-hosted runner labelled mi355x-slurm, which submits the sweep
+# as a 1-node Slurm job on 8x MI355X (.github/scripts/cluster/). Holding a
+# whole node no longer crowds out the test jobs, so pull requests get a small
+# grid on every push; pushes to main and manual runs keep the full grid --
+# three collectives x 2/4/8 ranks x 16 shapes (2 MiB to 1 GiB) x
+# fp16/bf16/fp8, for Iris and RCCL.
+#
+# The scheduler settings are repository variables (IRIS_CLUSTER_ACCOUNT,
+# IRIS_CLUSTER_QOS, optional IRIS_CLUSTER_PARTITION, IRIS_CLUSTER_GRES,
+# IRIS_CLUSTER_CACHE); until IRIS_CLUSTER_ACCOUNT is set, the job is skipped
+# rather than left queued. Pull requests from forks run in the `cluster-ci`
+# environment, whose required reviewers approve each run, so code from a fork
+# never reaches the cluster unreviewed.
 on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       num_ranks:
@@ -30,83 +46,66 @@ on:
         description: "Timed iterations per point"
         required: false
         default: "50"
-  push:
-    branches: [ main ]
 
 permissions:
   contents: read
 
+# A newer push to the same pull request replaces its queued or running sweep.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
-env:
-  DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME || 'iris-dev-triton-aafec41' }}
 
 jobs:
   ccl-benchmark:
-    name: CCL benchmark (Iris vs RCCL)
-    runs-on: [linux-mi350-8gpu-iris]
-    timeout-minutes: 360
+    name: CCL benchmark (Iris vs RCCL, MI355X)
+    if: vars.IRIS_CLUSTER_ACCOUNT != ''
+    runs-on: [self-hosted, mi355x-slurm]
+    environment: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'cluster-ci' || '' }}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 60 || 360 }}
 
     # Dispatch inputs are bound to environment variables rather than
     # interpolated into run: blocks. ${{ }} expansion happens before the shell
     # sees the script, so interpolating user-controlled input directly is a
-    # command-injection vector.
+    # command-injection vector. Pull requests get a small grid that runs in about two
+    # minutes once the image is on the node; M=65536 alone takes longer than that.
     env:
-      NUM_RANKS: ${{ github.event.inputs.num_ranks || '2,4,8' }}
-      DTYPES: ${{ github.event.inputs.dtypes || 'fp16,bf16,fp8' }}
-      M_VALUES: ${{ github.event.inputs.m_values || '1024,4096,16384,65536' }}
-      N_VALUES: ${{ github.event.inputs.n_values || '1024,2048,4096,8192' }}
-      N_REPEAT: ${{ github.event.inputs.n_repeat || '50' }}
+      NUM_RANKS: ${{ github.event.inputs.num_ranks || (github.event_name == 'pull_request' && '8' || '2,4,8') }}
+      DTYPES: ${{ github.event.inputs.dtypes || (github.event_name == 'pull_request' && 'bf16' || 'fp16,bf16,fp8') }}
+      M_VALUES: ${{ github.event.inputs.m_values || (github.event_name == 'pull_request' && '1024,4096,16384' || '1024,4096,16384,65536') }}
+      N_VALUES: ${{ github.event.inputs.n_values || (github.event_name == 'pull_request' && '1024,8192' || '1024,2048,4096,8192') }}
+      N_REPEAT: ${{ github.event.inputs.n_repeat || (github.event_name == 'pull_request' && '20' || '50') }}
+      JOB_TIME: ${{ github.event_name == 'pull_request' && '0:50:00' || '5:45:00' }}
+      IRIS_CLUSTER_ACCOUNT: ${{ vars.IRIS_CLUSTER_ACCOUNT }}
+      IRIS_CLUSTER_QOS: ${{ vars.IRIS_CLUSTER_QOS }}
+      IRIS_CLUSTER_PARTITION: ${{ vars.IRIS_CLUSTER_PARTITION }}
+      IRIS_CLUSTER_GRES: ${{ vars.IRIS_CLUSTER_GRES }}
+      IRIS_CLUSTER_CACHE: ${{ vars.IRIS_CLUSTER_CACHE }}
 
     steps:
       - name: Checkout repository
-        # Unpinned to match the other workflows in this repo, which all use
-        # floating major tags. The scan only audits *changed* files, so it would
-        # flag this one alone while the rest go unchecked -- suppressed here so
-        # the convention stays consistent rather than diverging in one file.
-        uses: actions/checkout@v7.0.1 # zizmor: ignore[unpinned-uses]
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes, and the sweep uploads artifacts -- do not leave
           # credentials in .git/config where they could be packaged up.
           persist-credentials: false
 
-      - name: Setup Apptainer (if not available)
+      - name: Run the sweep on one node
         run: |
-          if ! command -v apptainer &> /dev/null && ! command -v docker &> /dev/null; then
-            echo "[ERROR] Neither Apptainer nor Docker is available"
-            exit 1
-          fi
-
-      - name: Build Iris container
-        run: |
-          bash .github/scripts/container_build.sh
-
-      - name: Run the sweep
-        run: |
-          # Validate first: num_ranks sizes the GPU request below, before
-          # run_ccl_benchmark.sh checks its inputs.
+          # Validate first: run_ccl_benchmark.sh checks the rest of its inputs.
           if ! [[ "$NUM_RANKS" =~ ^[1-8](,[1-8])*$ ]]; then
             echo "[ERROR] num_ranks must be comma-separated integers 1-8, got '$NUM_RANKS'"
             exit 1
           fi
-          # Enough GPUs for the largest rank count; smaller ones run inside it.
-          MAX_RANKS=$(echo "$NUM_RANKS" | tr ',' '\n' | sort -n | tail -1)
-          # Single-quoted: the task's shell expands the inputs from the
-          # environment, so they are never spliced into the command text. The
-          # task runs in a private copy of the checkout that is deleted when it
-          # ends, so copy the results out for the steps below, even on failure.
-          python3 .github/scripts/gpu_task_queue.py --task "$MAX_RANKS" "CCL sweep" \
-            'bash .github/scripts/run_ccl_benchmark.sh "$NUM_RANKS" "$DTYPES" "$M_VALUES" "$N_VALUES" "$N_REPEAT"; rc=$?
-             cp -r ccl_results "$GITHUB_WORKSPACE/" 2>/dev/null; exit $rc'
+          rm -rf ccl_results
+          bash .github/scripts/cluster/launch.sh 1 "$JOB_TIME" \
+            bash .github/scripts/run_ccl_benchmark.sh "$NUM_RANKS" "$DTYPES" "$M_VALUES" "$N_VALUES" "$N_REPEAT"
 
       - name: Publish the comparison table
         if: always()
         run: |
           if [ -f ccl_results/summary.md ]; then
             {
-              echo "## Iris vs RCCL — ranks ${NUM_RANKS}, ${DTYPES}"
+              echo "## Iris vs RCCL on MI355X — ranks ${NUM_RANKS}, ${DTYPES}"
               echo ""
               echo "Commit \`${GITHUB_SHA::8}\`. Speedup is RCCL latency / Iris latency: above 1.00x means Iris is faster."
               echo "One image per collective and dtype is in the run's artifact."
@@ -123,10 +122,3 @@ jobs:
         with:
           name: ccl-benchmark-${{ github.run_id }}
           path: ccl_results/
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Release GPUs
-        if: always()
-        run: |
-          bash .github/scripts/release_gpus.sh

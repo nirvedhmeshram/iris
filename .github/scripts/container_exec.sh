@@ -34,6 +34,17 @@ if [ -z "$COMMAND" ]; then
     exit 1
 fi
 
+# Already inside the CI image (the cluster runner starts one container per node,
+# see .github/scripts/cluster/node.sh, with the checkout at /iris_workspace):
+# run the command here rather than starting a container within the container.
+if [ "${IRIS_IN_CONTAINER:-0}" = "1" ]; then
+    export HSA_NO_SCRATCH_RECLAIM=1
+    if [ -n "$GPU_DEVICES" ]; then
+        export HIP_VISIBLE_DEVICES="$GPU_DEVICES"
+    fi
+    cd /iris_workspace && exec bash -c "$COMMAND"
+fi
+
 # Check which container runtime is available
 if command -v apptainer &> /dev/null; then
     CONTAINER_RUNTIME="apptainer"
